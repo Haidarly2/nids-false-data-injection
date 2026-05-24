@@ -4,6 +4,18 @@ import socket
 import time
 import json
 
+
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super(NpEncoder, self).default(obj)
+
+
 # =======================================================
 # 1. KONFIGURASI JARINGAN LOKAL (LOCALHOST)
 # =======================================================
@@ -106,8 +118,8 @@ def mulai_generator():
     # Kita tidak perlu menyimpan dataframe yang berat lagi
     del df_full
 
-    jumlah_serangan = 50
-    jumlah_normal = 4950
+    jumlah_serangan = 2500
+    jumlah_normal = 2500
     total_paket = jumlah_serangan + jumlah_normal
 
     print(f"🧬 Memproduksi {total_paket} data sintetis unik secara real-time...")
@@ -130,11 +142,41 @@ def mulai_generator():
                 time.sleep(2)
 
         # Proses Transmisi (Fase 2 Proposal)
+        # =======================================================
+        # PROSES TRANSMISI DENGAN INJEKSI CONCEPT DRIFT REALISTIS
+        # =======================================================
+        print("🚀 Memulai transmisi dinamis...")
         for i, label in enumerate(urutan_label):
-            # Ciptakan data BARU tepat sepersekian milidetik sebelum dikirim
-            data_sintetis = generate_synthetic_data(blueprint, label)
 
-            pesan = json.dumps(data_sintetis) + "\n"
+            # KUNCI EXPERIMEN: Injeksi Concept Drift (Low-and-Slow Mimicry)
+            # KUNCI EXPERIMEN: Injeksi Concept Drift (Penyamaran Parsial)
+            if i >= 2000 and label == 1:
+                # 1. Hasilkan data dengan atribut Numerik mirip TRAFIK NORMAL
+                data_samaran = generate_synthetic_data(blueprint, 0)
+
+                # 2. Hasilkan data dengan atribut Kategorikal asli SERANGAN
+                data_asli = generate_synthetic_data(blueprint, 1)
+
+                # 3. GABUNGKAN (Frankenstein: Wajah Normal, Tapi Senjata Serangan)
+                data_sintetis = {}
+                # Ambil fitur angka (bytes, latency) dari data samaran
+                for col in blueprint[0]["numerik"].keys():
+                    data_sintetis[col] = data_samaran[col]
+
+                # Ambil fitur kategori (port, tcp flags) dari data asli hacker
+                for col in blueprint[1]["kategorikal"].keys():
+                    data_sintetis[col] = data_asli[col]
+
+                data_sintetis["Label"] = 1  # Kunci jawaban tetap 1 (Serangan)
+
+                if i == 2000:
+                    print(
+                        "\n🚨 [ALERT] CONCEPT DRIFT: Hacker menyamarkan ukuran paket, tapi jejak Port/Flag tertinggal! 🚨\n"
+                    )
+            else:
+                data_sintetis = generate_synthetic_data(blueprint, label)
+
+            pesan = json.dumps(data_sintetis, cls=NpEncoder) + "\n"
 
             try:
                 s.sendall(pesan.encode("utf-8"))

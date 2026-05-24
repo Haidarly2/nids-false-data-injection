@@ -5,6 +5,7 @@ import time
 import pickle
 import pandas as pd
 from river import metrics
+from river import utils
 
 st.set_page_config(page_title="NIDS Prequential Gateway", layout="wide")
 
@@ -24,8 +25,8 @@ def inisialisasi_state():
 
     if "metric_acc" not in st.session_state:
         # Metrik River untuk evaluasi instan
-        st.session_state.metric_acc = metrics.Accuracy()
-        st.session_state.metric_f1 = metrics.F1()
+        st.session_state.metric_acc = utils.Rolling(metrics.Accuracy(), window_size=300)
+        st.session_state.metric_f1 = utils.Rolling(metrics.F1(), window_size=300)
 
     if "history_acc" not in st.session_state:
         st.session_state.history_acc = []
