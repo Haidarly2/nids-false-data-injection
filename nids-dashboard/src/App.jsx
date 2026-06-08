@@ -139,18 +139,18 @@ function App() {
           </div>
           <div className="space-y-2">
             <h1 className="text-2xl font-extrabold tracking-tight">
-              NIDS COMMAND CENTER
+              NIDS Dasboard IoT
             </h1>
             <p className="text-sm text-slate-400">
               Sistem Deteksi Serangan False Data Injection Berbasis Incremental
-              Learning pada Perangkat Medical IoT
+              Learning pada Perangkat IoT
             </p>
           </div>
           <button
             onClick={() => setView("dashboard")}
             className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 px-4 rounded-xl transition duration-200 group shadow-lg shadow-blue-600/20"
           >
-            Masuk Ke Command Center
+            Masuk Ke Dasboard
             <ArrowRight
               size={18}
               className="transform group-hover:translate-x-1 transition-transform"
@@ -172,7 +172,7 @@ function App() {
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 border-b pb-4 border-slate-200">
             <div>
               <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
-                NIDS Medical IoT Command Center
+                NIDS IoT Dasboard
               </h1>
               <p className="text-sm font-medium text-slate-500 mt-1">
                 Status API: {statusServer}

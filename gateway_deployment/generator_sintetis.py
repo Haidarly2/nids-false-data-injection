@@ -3,7 +3,7 @@ import numpy as np
 import socket
 import time
 import json
-
+import argparse
 
 class NpEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -19,7 +19,7 @@ class NpEncoder(json.JSONEncoder):
 # =======================================================
 # 1. KONFIGURASI JARINGAN LOKAL (LOCALHOST)
 # =======================================================
-HOST = "127.0.0.1"
+HOST = "10.0.2.2"
 PORT = 9999
 
 # Daftar kolom yang berupa kategori/identitas (tidak bisa dihitung mean/std-nya)
@@ -107,10 +107,18 @@ def generate_synthetic_data(blueprint, label):
 # =======================================================
 # 4. ALUR UTAMA PROGRAM
 # =======================================================
-def mulai_generator():
+def mulai_generator(mode_ablasi=False):
+    np.random.seed(42) 
     print("⏳ Membaca dataset asli untuk membuat blueprint...")
     # Baca dataset utuh SATU KALI saja
     df_full = pd.read_csv("../datasets/dataset_final_2juta.csv")
+
+    if mode_ablasi:
+        kolom_iat = [col for col in df_full.columns if 'IAT' in col]
+        print(f"\n🔪 [MODE ABLASI AKTIF] Membuang {len(kolom_iat)} kolom IAT untuk menguji sensitivitas model...\n")
+        df_full.drop(columns=kolom_iat, inplace=True)
+    else:
+        print("\n✅ [MODE BASELINE AKTIF] Menggunakan seluruh dimensi fitur secara utuh.\n")
 
     blueprint = buat_blueprint_statistik(df_full)
     print("✅ Blueprint statistik berhasil diamankan di RAM!")
@@ -118,8 +126,8 @@ def mulai_generator():
     # Kita tidak perlu menyimpan dataframe yang berat lagi
     del df_full
 
-    jumlah_serangan = 2500
-    jumlah_normal = 2500
+    jumlah_serangan = 10000
+    jumlah_normal = 40000
     total_paket = jumlah_serangan + jumlah_normal
 
     print(f"🧬 Memproduksi {total_paket} data sintetis unik secara real-time...")
@@ -150,7 +158,7 @@ def mulai_generator():
 
             # KUNCI EXPERIMEN: Injeksi Concept Drift (Low-and-Slow Mimicry)
             # KUNCI EXPERIMEN: Injeksi Concept Drift (Penyamaran Parsial)
-            if i >= 2000 and label == 1:
+            if i >= 20000 and label == 1:
                 # 1. Hasilkan data dengan atribut Numerik mirip TRAFIK NORMAL
                 data_samaran = generate_synthetic_data(blueprint, 0)
 
@@ -169,7 +177,7 @@ def mulai_generator():
 
                 data_sintetis["Label"] = 1  # Kunci jawaban tetap 1 (Serangan)
 
-                if i == 2000:
+                if i == 20000:
                     print(
                         "\n🚨 [ALERT] CONCEPT DRIFT: Hacker menyamarkan ukuran paket, tapi jejak Port/Flag tertinggal! 🚨\n"
                     )
@@ -193,4 +201,18 @@ def mulai_generator():
 
 
 if __name__ == "__main__":
-    mulai_generator()
+    # Inisialisasi pembaca argumen dari terminal
+    parser = argparse.ArgumentParser(description="Generator Trafik Sintetis untuk NIDS")
+    
+    # Menambahkan flag --tanpa-iat
+    parser.add_argument(
+        '--tanpa-iat', 
+        action='store_true', 
+        help="Aktifkan ini untuk menjalankan Studi Ablasi (Membuang fitur IAT)"
+    )
+    
+    # Membaca argumen yang diketik di terminal
+    args = parser.parse_args()
+
+    # Menjalankan fungsi utama dengan mengirimkan status flag
+    mulai_generator(mode_ablasi=args.tanpa_iat)
