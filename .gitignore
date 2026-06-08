@@ -1,0 +1,42 @@
+# =========================
+# 1. Environment Variables
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# 2. Node.js & Frontend (React/Vite)
+# =========================
+node_modules/
+dist/
+build/
+npm-debug.log
+yarn-error.log
+
+# =========================
+# 3. Backend (PHP/Laravel)
+# =========================
+vendor/
+public/hot
+public/storage
+storage/*.key
+bootstrap/cache/
+
+# =========================
+# 4. Python & Jupyter (AI/Data)
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+.ipynb_checkpoints/
+
+# =========================
+# 5. OS & Editor & Docker
+# =========================
+.DS_Store
+.vscode/
+.idea/
+docker-data/    # Jika Anda melakukan mapping volume database Docker ke folder lokal

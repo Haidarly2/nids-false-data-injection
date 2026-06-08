@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  backend-nids:
+    build: ./backend
+    container_name: nids-api-engine
+    ports:
+      - "8080:8080" # Port untuk Dashboard React
+      - "9999:9999" # Port untuk serangan dari Parrot OS
+    restart: always
+
+  frontend-dashboard:
+    build: ./nids-dashboard
+    container_name: nids-dashboard-ui
+    ports:
+      - "5173:80" # Memetakan port 5173 di laptop Anda ke port 80 Nginx di dalam kontainer
+    depends_on:
+      - backend-nids
+    restart: always
