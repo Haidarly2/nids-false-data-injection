@@ -2,21 +2,26 @@ import socket
 import json
 import time
 import psutil
+import pickle
 import os
 from datetime import datetime
 from river import compose, preprocessing, tree, ensemble, metrics
 
-print("=" * 60)
-print("🚀 MENGINISIALISASI GATEWAY NIDS (COLD START) 🚀")
-print("=" * 60)
+MODEL_FILE = "model_nids_terbaru.pkl"
 
-# 1. MEMBANGUN ARSITEKTUR AI (Dari Kode .ipynb Anda)
-# Kita bangun dari keadaan KOSONG (Cold Start) untuk membuktikan kemampuan adaptasi real-time.
-base_model = tree.HoeffdingTreeClassifier()
-model = compose.Pipeline(
-    preprocessing.MinMaxScaler(),
-    ensemble.ADWINBaggingClassifier(model=base_model, n_models=10, seed=42),
-)
+if os.path.exists(MODEL_FILE):
+    # Kasus Nyata: Gateway nyala ulang setelah mati lampu, load ingatan lama
+    print(f"Memuat memori model AI dari {MODEL_FILE}...")
+    with open(MODEL_FILE, "rb") as f:
+        model = pickle.load(f)
+else:
+    # Kasus Nyata: Pemasangan pertama kali di Rumah Sakit (Cold Start)
+    print("Membangun model AI dari nol (Cold Start)...")
+    base_model = tree.HoeffdingTreeClassifier()
+    model = compose.Pipeline(
+        preprocessing.MinMaxScaler(),
+        ensemble.ADWINBaggingClassifier(model=base_model, n_models=10, seed=42),
+    )
 
 # 2. MENYIAPKAN 5 METRIK EVALUASI
 metric_acc = metrics.Accuracy()
@@ -41,16 +46,11 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind((HOST, PORT))
     s.listen()
-
-    print(f"\n[INFO] Gateway NIDS Berjalan di Background.")
-    print(f"[INFO] Menunggu serangan dari VM di Port {PORT}...\n")
+    print(f"Gateway Listener aktif di {HOST}:{PORT}")
 
     conn, addr = s.accept()
     with conn:
-        print(f"🔥 [ALERT] Koneksi masuk dari Mesin Penyerang: {addr} 🔥")
-        print("Memulai pemrosesan Prequential Evaluation...\n")
-
-        # Membaca aliran data bagaikan air yang mengalir dari selang
+        print(f"Menerima aliran data dari {addr}")
         file_stream = conn.makefile("r", encoding="utf-8")
 
         for baris in file_stream:
@@ -59,20 +59,20 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 continue
 
             try:
-                # Waktu mulai proses 1 paket (Untuk hitung latensi)
                 waktu_mulai_paket = time.time()
+                total_diproses += 1
 
                 # Terjemahkan string mentah menjadi objek JSON (Dictionary Python)
                 fitur_jaringan = json.loads(baris)
 
-                # 4. FASE PEMROSESAN INTI (Tanpa Data Frame Pandas)
+                # 4. FASE PEMROSESAN INTI
                 # a. Cabut Label (Ground Truth) agar model tidak menyontek
                 y_true = fitur_jaringan.pop("Label", None)
 
-                # b. Testing (Tebak buta berdasarkan fitur teknis)
+                # b. Testing (Prediksi awal sebelum belajar)
                 y_pred = model.predict_one(fitur_jaringan)
 
-                # c. Evaluasi (Cocokkan tebakan dengan kunci jawaban)
+                # c. Evaluasi (LENGKAP 5 METRIK SESUAI BAB 3)
                 if y_pred is not None and y_true is not None:
                     metric_acc.update(y_true, y_pred)
                     metric_prec.update(y_true, y_pred)
@@ -83,6 +83,11 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 # d. Training (Belajar seketika dari paket tersebut)
                 if y_true is not None:
                     model.learn_one(fitur_jaringan, y_true)
+
+                # Simpan ingatan model ke harddisk setiap kelipatan 5.000 paket
+                if total_diproses % 5000 == 0:
+                    with open(MODEL_FILE, "wb") as f:
+                        pickle.dump(model, f)
 
                 # Waktu selesai proses (Kalkulasi Latensi dalam milidetik)
                 latensi_ms = (time.time() - waktu_mulai_paket) * 1000

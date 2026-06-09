@@ -4,6 +4,8 @@ import json
 import os
 import subprocess
 import sys
+import shutil
+from datetime import datetime
 
 app = FastAPI(title="NIDS Gateway API", version="1.1")
 
@@ -16,7 +18,7 @@ app.add_middleware(
 )
 
 LOG_FILE = "log_hasil_nids.json"
-# Variabel global untuk menyimpan status proses gateway_engine.py
+ARSIP_DIR = "arsip_log_server_pusat"
 engine_process = None
 
 
@@ -42,11 +44,23 @@ def start_engine():
         return {"status": "success", "message": "Engine sudah berjalan"}
 
     try:
-        # Menghapus log lama agar simulasi mulai dari nol
-        if os.path.exists(LOG_FILE):
-            os.remove(LOG_FILE)
+        if not os.path.exists(ARSIP_DIR):
+            os.makedirs(ARSIP_DIR)  # Buat folder otomatis jika belum ada
 
-        # Menjalankan gateway_engine.py di background Windows
+        if os.path.exists(LOG_FILE):
+            # Format waktu: TahunBulanTanggal_JamMenitDetik
+            waktu_arsip = datetime.now().strftime("%Y%m%d_%H%M%S")
+            nama_arsip = f"arsip_log_{waktu_arsip}.json"
+            jalur_arsip = os.path.join(ARSIP_DIR, nama_arsip)
+
+            # Pindahkan (Backup) log lama ke folder arsip Cloud
+            shutil.copy(LOG_FILE, jalur_arsip)
+            print(f"Log lama berhasil diarsipkan ke: {jalur_arsip}")
+
+            # Hapus log di memori lokal Gateway (Meringankan memori Edge)
+            os.remove(LOG_FILE)
+        # ========================================================
+
         engine_process = subprocess.Popen(
             [sys.executable, "gateway_engine.py"],
             stdout=subprocess.DEVNULL,
