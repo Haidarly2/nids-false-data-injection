@@ -85,9 +85,13 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                     model.learn_one(fitur_jaringan, y_true)
 
                 # Simpan ingatan model ke harddisk setiap kelipatan 5.000 paket
-                if total_diproses % 5000 == 0:
+                # if total_diproses % 5000 == 0:
+                #     with open(MODEL_FILE, "wb") as f:
+                #         pickle.dump(model, f)
+                if total_diproses == 50000:
                     with open(MODEL_FILE, "wb") as f:
                         pickle.dump(model, f)
+                    print(f"✅ Model AI berhasil disimpan secara permanen pada paket {total_diproses}!")
 
                 # Waktu selesai proses (Kalkulasi Latensi dalam milidetik)
                 latensi_ms = (time.time() - waktu_mulai_paket) * 1000
@@ -135,3 +139,11 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             except json.JSONDecodeError:
                 print("[ERROR] Paket data rusak / bukan JSON valid.")
                 pass
+            
+        print(f"\nTransmisi selesai! Menerima total {total_diproses} paket.")
+        try:
+            with open(MODEL_FILE, "wb") as f:
+                pickle.dump(model, f)
+            print("✅ Model AI berhasil disimpan secara permanen di akhir sesi!")
+        except Exception as e:
+            print(f"❌ GAGAL MENYIMPAN MODEL: {e}")

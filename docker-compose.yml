@@ -7,6 +7,8 @@ services:
     ports:
       - "8080:8080" # Port untuk Dashboard React
       - "9999:9999" # Port untuk serangan dari Parrot OS
+    volumes:
+      - ./backend:/app
     restart: always
 
   frontend-dashboard:
