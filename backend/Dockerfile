@@ -6,8 +6,9 @@ WORKDIR /app
 
 # Menggunakan Conda Forge untuk menarik versi pustaka yang SUDAH MATANG (Pre-compiled)
 # Trik ini melewati (bypass) seluruh masalah "Failed building wheel" pada pip
-RUN conda install -y -c conda-forge fastapi uvicorn river numpy psutil
+RUN conda install -y -c conda-forge fastapi uvicorn river numpy psutil scikit-learn joblib
 
+RUN pip install --no-cache-dir tensorflow-cpu
 # Menyalin seluruh file skrip NIDS Anda (gateway_engine.py & api_server.py)
 COPY . .
 
