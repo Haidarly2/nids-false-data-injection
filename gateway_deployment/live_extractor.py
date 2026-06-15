@@ -1,6 +1,7 @@
 from nfstream import NFStreamer
 import socket
 import json
+import pprint
 
 NIDS_IP = "127.0.0.1"
 NIDS_PORT = 9999
@@ -38,14 +39,18 @@ for flow in streamer:
     is_fdi_attack = flow.src2dst_bytes >= 1000 and flow.src2dst_packets >= 10
 
     # KITA SUAPI AI AGAR IA BELAJAR DNA WSL!
-    MODE_KALIBRASI = False 
-    
+    MODE_KALIBRASI = False
+
     if MODE_KALIBRASI:
         ground_truth = 1 if is_fdi_attack else 0
-        print(f"[*] KALIBRASI AI... Trafik: {'SERANGAN' if is_fdi_attack else 'NORMAL'} | Bytes: {flow.src2dst_bytes}")
+        print(
+            f"[*] KALIBRASI AI... Trafik: {'SERANGAN' if is_fdi_attack else 'NORMAL'} | Bytes: {flow.src2dst_bytes}"
+        )
     else:
         ground_truth = None
-        print(f"[!] MODE UJIAN AKTIF! AI Menebak Mandiri... | Bytes: {flow.src2dst_bytes}")
+        print(
+            f"[!] MODE UJIAN AKTIF! AI Menebak Mandiri... | Bytes: {flow.src2dst_bytes}"
+        )
 
     payload_nids = {
         "L4_SRC_PORT": flow.src_port,
@@ -106,4 +111,16 @@ for flow in streamer:
         # INJEKSI LABEL UNTUK TRAINING
         "Label": ground_truth,
     }
+
+    MODE_INSPEKSI_TERMINAL = True  # Ubah ke False jika terminal terlalu penuh
+    MODE_SIMPAN_KE_FILE = True  # Ubah ke True untuk menyimpan ke file txt
+
+    if MODE_INSPEKSI_TERMINAL:
+        print(f"\n[+] Aliran Data Terdeteksi! (Protokol: {payload_nids['PROTOCOL']})")
+        pprint.pprint(payload_nids)  # Mencetak isi payload secara vertikal dan rapi
+
+    if MODE_SIMPAN_KE_FILE:
+        with open("debug_raw_nfstream.json", "a") as f:
+            f.write(json.dumps(payload_nids) + "\n")
+
     kirim_ke_nids(payload_nids)

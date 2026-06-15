@@ -21,7 +21,7 @@ app.add_middleware(
 LOG_FILE = "log_hasil_nids.json"
 ARSIP_DIR = "arsip_log_server_pusat"
 engine_process = None
-model_saat_ini = "incremental"  # Default saat pertama nyala
+model_saat_ini = "incremental_demo"  # Default saat pertama nyala
 
 
 class SwitchModelRequest(BaseModel):
@@ -85,27 +85,21 @@ def stop_engine():
     return {"status": "success"}
 
 
-# ===========================================================
-# ENDPOINT BARU: SWITCH MODEL (Diakses dari tombol Dashboard)
-# ===========================================================
 @app.post("/api/engine/switch")
 def switch_engine(req: SwitchModelRequest):
     global engine_process, model_saat_ini
 
-    if req.model_name not in ["incremental", "rf", "dnn"]:
+    if req.model_name not in ["incremental_demo", "incremental_train", "rf", "dnn"]:
         return {"status": "error", "pesan": "Model tidak valid"}
 
     model_saat_ini = req.model_name
 
-    # Matikan proses yang lama
     if engine_process and engine_process.poll() is None:
         engine_process.terminate()
-        engine_process.wait()  # Tunggu sampai benar-benar mati
+        engine_process.wait()
 
-    # Langsung nyalakan kembali dengan argumen model yang baru
-    # (Kita TIDAK mengarsipkan log agar grafik di dasbor bersambung dan tidak putus)
     engine_process = subprocess.Popen(
-        [sys.executable, "gateway_engine.py", model_saat_ini],
+        [sys.executable, "gateway_engine_copy.py", model_saat_ini],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
@@ -125,15 +119,29 @@ def get_nids_data():
 
         total_aman = 0
         total_ancaman = 0
+        sum_latensi = 0.0
+        sum_ram = 0.0
+        count_valid = 0
         for line in lines:
             if line.strip():
-                item = json.loads(line.strip())
-                if item.get("prediksi_ai") == 1:
-                    total_ancaman += 1
-                else:
-                    total_aman += 1
+                try:
+                    item = json.loads(line.strip())
+                    if item.get("prediksi_ai") == 1:
+                        total_ancaman += 1
+                    else:
+                        total_aman += 1
+
+                    # Agregasi untuk nilai Rata-rata
+                    res = item.get("resource", {})
+                    sum_latensi += res.get("latensi_ms", 0)
+                    sum_ram += res.get("ram_mb", 0)
+                    count_valid += 1
+                except:
+                    continue
 
         data_paket = [json.loads(line.strip()) for line in lines[-100:] if line.strip()]
+        avg_latensi = sum_latensi / count_valid if count_valid > 0 else 0
+        avg_ram = sum_ram / count_valid if count_valid > 0 else 0
 
         return {
             "status": "sukses",
@@ -142,6 +150,10 @@ def get_nids_data():
             "summary_kumulatif": {
                 "total_aman": total_aman,
                 "total_ancaman": total_ancaman,
+            },
+            "rekap_rata_rata": {
+                "avg_latensi_ms": round(avg_latensi, 4),
+                "avg_ram_mb": round(avg_ram, 2),
             },
             "data": data_paket,
         }

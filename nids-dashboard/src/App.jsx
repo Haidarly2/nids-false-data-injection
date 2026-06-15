@@ -10,12 +10,17 @@ export default function App() {
   const [attackLogs, setAttackLogs] = useState([]);
   const [statusServer, setStatusServer] = useState("Menghubungkan ke API...");
   const [engineStatus, setEngineStatus] = useState("stopped");
-  const [activeModel, setActiveModel] = useState("incremental");
+  const [activeModel, setActiveModel] = useState("incremental_demo");
   const [isUnderAttack, setIsUnderAttack] = useState(false);
   const [summary, setSummary] = useState({
     total: 0,
     paketAman: 0,
     paketAncaman: 0,
+  });
+
+  const [rekapAvg, setRekapAvg] = useState({
+    avg_latensi_ms: 0,
+    avg_ram_mb: 0,
   });
 
   useEffect(() => {
@@ -33,6 +38,10 @@ export default function App() {
             setActiveModel(result.active_model);
           }
 
+          if (result.rekap_rata_rata) {
+            setRekapAvg(result.rekap_rata_rata);
+          }
+
           const formattedData = result.data.map((item) => {
             const isAttack = item.prediksi_ai === 1;
             return {
@@ -42,7 +51,10 @@ export default function App() {
               latensi: item.resource?.latensi_ms || 0,
               ram: item.resource?.ram_mb || 0,
               akurasi: item.metrik?.akurasi || 0,
+              precision: item.metrik?.precision || 0, // Tambahan metrik baru
+              recall: item.metrik?.recall || 0,
               f1_score: item.metrik?.f1_score || 0,
+              kappa: item.metrik?.kappa_statistic || 0,
             };
           });
 
@@ -97,6 +109,7 @@ export default function App() {
           setDataNids([]);
           setAttackLogs([]);
           setSummary({ total: 0, paketAman: 0, paketAncaman: 0 });
+          setRekapAvg({ avg_latensi_ms: 0, avg_ram_mb: 0 });
         }
       }
     } catch (e) {
@@ -172,7 +185,11 @@ export default function App() {
         <KPICards
           summary={summary}
           akurasiSaatIni={dataTerbaru?.akurasi || 0}
+          precisionSaatIni={dataTerbaru?.precision || 0}
+          recallSaatIni={dataTerbaru?.recall || 0}
           f1SaatIni={dataTerbaru?.f1_score || 0}
+          kappaSaatIni={dataTerbaru?.kappa || 0}
+          rekapAvg={rekapAvg}
         />
 
         {/* DI SINI LETAK KOMPONEN CHARTS KITA */}

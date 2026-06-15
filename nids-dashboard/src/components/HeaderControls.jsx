@@ -36,7 +36,8 @@ export default function HeaderControls({
             disabled={engineStatus !== "running"}
             className="px-4 py-3 rounded-xl border border-slate-300 font-semibold bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
           >
-            <option value="incremental">🧠 Incremental (River)</option>
+            <option value="incremental_demo">🟢 Mode Demo (Aman)</option>
+            <option value="incremental_train">🧪 Mode Eksperimen (Training)</option>
             <option value="rf">🌳 Random Forest (Batch)</option>
             <option value="dnn">🕸️ Deep Learning (Batch)</option>
           </select>

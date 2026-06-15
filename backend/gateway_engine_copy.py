@@ -5,6 +5,7 @@ import psutil
 import pickle
 import os
 import sys
+import joblib
 import numpy as np
 from datetime import datetime
 from river import compose, preprocessing, tree, ensemble, metrics
@@ -20,21 +21,31 @@ C_CYAN = "\033[96m"
 C_RESET = "\033[0m"
 
 # =======================================================
-# 1. INISIALISASI ENGINE & MODEL
+# 1. INISIALISASI ENGINE & ISOLASI ENVIRONMENT
 # =======================================================
-TIPE_MODEL = sys.argv[1] if len(sys.argv) > 1 else "incremental"
+# Pilihan Argumen: 'incremental_demo', 'incremental_train', 'rf', 'dnn'
+TIPE_MODEL = sys.argv[1] if len(sys.argv) > 1 else "incremental_demo"
 print(f"{C_CYAN}===================================================={C_RESET}")
 print(
     f"{C_CYAN}🛡️  Menghidupkan NIDS Gateway Engine [{TIPE_MODEL.upper()}] 🛡️{C_RESET}"
 )
 print(f"{C_CYAN}===================================================={C_RESET}")
 
-MODEL_INC_FILE = "model_nids_terbaru.pkl"
+# ISOLASI MEMORI (AGAR DEMO TIDAK RUSAK KARENA TRAINING)
+if TIPE_MODEL == "incremental_demo":
+    MODEL_INC_FILE = "model_nids_terbaru.pkl"  # KHUSUS DEMO SIDANG
+else:
+    MODEL_INC_FILE = "model_nids_eksperimen.pkl"  # KHUSUS MENCARI DATA BAB 6
+
+MODEL_RF_FILE = "model_rf_batch.pkl"
+MODEL_DNN_FILE = "model_dnn_batch.keras"
+SCALER_FILE = "scaler_batch.pkl"
 LOG_FILE = "log_hasil_nids.json"
 
-model_inc = None
+model_inc, rf_model, dnn_model, batch_scaler = None, None, None, None
 
-if TIPE_MODEL == "incremental":
+# MUAT MODEL SESUAI PILIHAN
+if "incremental" in TIPE_MODEL:
     if os.path.exists(MODEL_INC_FILE):
         print(f"[*] Memuat memori AI dari: {MODEL_INC_FILE}")
         with open(MODEL_INC_FILE, "rb") as f:
@@ -46,10 +57,23 @@ if TIPE_MODEL == "incremental":
             preprocessing.MinMaxScaler(),
             ensemble.ADWINBaggingClassifier(model=base_model, n_models=10, seed=42),
         )
+elif TIPE_MODEL == "rf":
+    rf_model = joblib.load(MODEL_RF_FILE)
+    batch_scaler = joblib.load(SCALER_FILE)
+    print("[*] Model Random Forest (Batch) berhasil dimuat.")
+elif TIPE_MODEL == "dnn":
+    from keras.models import load_model
 
-# Menyiapkan Metrik Streaming
+    dnn_model = load_model(MODEL_DNN_FILE)
+    batch_scaler = joblib.load(SCALER_FILE)
+    print("[*] Model Deep Learning (Batch) berhasil dimuat.")
+
+# Menyiapkan Metrik Streaming & Kumulatif Rata-rata
 metric_acc = metrics.Accuracy()
 metric_f1 = metrics.F1()
+metric_prec = metrics.Precision()
+metric_rec = metrics.Recall()
+metric_kappa = metrics.CohenKappa()
 total_diproses = 0
 
 
@@ -70,6 +94,11 @@ def simpan_log(fitur, y_true, y_pred, waktu_mulai):
         "metrik": {
             "akurasi": round(metric_acc.get() * 100, 2) if total_diproses > 1 else 0.0,
             "f1_score": round(metric_f1.get() * 100, 2) if total_diproses > 1 else 0.0,
+            "recall": round(metric_rec.get() * 100, 2) if total_diproses > 1 else 0.0,
+            "precision": round(metric_prec.get() * 100, 2) if total_diproses > 1 else 0.0,
+            "kappa_statistic": (
+                round(metric_kappa.get() * 100, 2) if total_diproses > 1 else 0.0
+            ),
         },
         "resource": {
             "latensi_ms": round(latensi_ms, 4),
@@ -108,52 +137,61 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 
                     try:
                         fitur_jaringan = json.loads(baris)
-                        y_true = fitur_jaringan.pop(
-                            "Label", None
-                        )  # Ambil dan Hapus Label
+                        y_true = fitur_jaringan.pop("Label", None)
                         y_pred = None
-
                         total_diproses += 1
 
                         # --- FASE INFERENSI (TEBAKAN AI) ---
-                        if TIPE_MODEL == "incremental":
+                        if "incremental" in TIPE_MODEL:
                             y_pred = model_inc.predict_one(fitur_jaringan)
-
-                            # Tampilkan di Terminal dengan Visual yang Rapi
-                            if y_pred == 1:
-                                status = f"{C_RED}[TERDETEKSI SERANGAN (1)]{C_RESET}"
-                            elif y_pred == 0:
-                                status = f"{C_GREEN}[Lalu Lintas Normal (0)]{C_RESET}"
-                            else:
-                                status = f"{C_YELLOW}[Memproses Pola... (-1)]{C_RESET}"
-
-                            print(
-                                f"Paket {total_diproses} | Pkts: {fitur_jaringan.get('IN_PKTS', 0):02d} | Bytes: {fitur_jaringan.get('IN_BYTES', 0):04d} --> Prediksi: {status}"
-                            )
-
-                            # --- FASE ADAPTASI (BELAJAR) ---
+                            # --- FASE ADAPTASI (BELAJAR) KHUSUS INCREMENTAL ---
                             if y_true is not None:
                                 model_inc.learn_one(fitur_jaringan, y_true)
-                                # Update metrik hanya jika ada kunci jawaban
-                                if y_pred is not None:
-                                    metric_acc.update(y_true, y_pred)
-                                    metric_f1.update(y_true, y_pred)
 
-                        # Simpan ke file log JSON
+                        elif TIPE_MODEL in ["rf", "dnn"]:
+                            nilai_fitur = np.array(
+                                list(fitur_jaringan.values())
+                            ).reshape(1, -1)
+                            fitur_scaled = batch_scaler.transform(nilai_fitur)
+
+                            if TIPE_MODEL == "rf":
+                                y_pred = int(rf_model.predict(fitur_scaled)[0])
+                            elif TIPE_MODEL == "dnn":
+                                prob = dnn_model.predict(fitur_scaled, verbose=0)[0][0]
+                                y_pred = 1 if prob > 0.5 else 0
+
+                        # --- KALKULASI METRIK BERJALAN ---
+                        if y_pred is not None and y_true is not None:
+                            metric_acc.update(y_true, y_pred)
+                            metric_f1.update(y_true, y_pred)
+                            metric_prec.update(y_true, y_pred)
+                            metric_rec.update(y_true, y_pred)
+                            metric_kappa.update(y_true, y_pred)
+
+                        # Tampilkan di Terminal
+                        if y_pred == 1:
+                            status = f"{C_RED}[TERDETEKSI SERANGAN (1)]{C_RESET}"
+                        elif y_pred == 0:
+                            status = f"{C_GREEN}[Lalu Lintas Normal (0)]{C_RESET}"
+                        else:
+                            status = f"{C_YELLOW}[Memproses Pola... (-1)]{C_RESET}"
+
+                        print(
+                            f"Paket {total_diproses} | Model: {TIPE_MODEL} | Prediksi: {status}"
+                        )
+
+                        # Simpan log
                         simpan_log(fitur_jaringan, y_true, y_pred, waktu_mulai)
 
                     except json.JSONDecodeError:
-                        print(
-                            f"{C_RED}[!] Error: Format data JSON dari Extractor rusak.{C_RESET}"
-                        )
                         continue
 
-                # Simpan ingatan model setelah koneksi dari ekstraktor ditutup
-                if TIPE_MODEL == "incremental" and model_inc is not None:
+                # Simpan ingatan model SETELAH aliran selesai (Khusus Incremental)
+                if "incremental" in TIPE_MODEL and model_inc is not None:
                     with open(MODEL_INC_FILE, "wb") as f:
                         pickle.dump(model_inc, f)
                     print(
-                        f"\n{C_YELLOW}[*] Ingatan AI berhasil disimpan ke .pkl{C_RESET}\n"
+                        f"\n{C_YELLOW}[*] Ingatan AI berhasil disimpan ke {MODEL_INC_FILE}{C_RESET}\n"
                     )
 
         except Exception as e:
