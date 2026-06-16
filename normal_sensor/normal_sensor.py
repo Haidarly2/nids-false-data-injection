@@ -5,8 +5,8 @@ import random
 
 # Mengarah ke IP WSL Anda (Tempat dummy_target.py berada)
 # Ganti dengan IP WSL Anda (misal: 172.24.x.x)
-TARGET_IP = "172.24.50.99" 
-TARGET_PORT = 8000
+TARGET_IP = "172.17.0.1" 
+TARGET_PORT = 8088
 
 print("[+] Sensor Medis Normal (Docker) Beroperasi...")
 
